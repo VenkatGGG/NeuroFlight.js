@@ -94,22 +94,25 @@ async function trainLoop(config: TrainingConfig): Promise<void> {
   const recentRewards: number[] = [];
   let bestReward = -Infinity;
 
+  // Batch training: accumulate steps before training
+  const BATCH_SIZE = 2048; // Train every N steps
+  let batchTrajectory: Trajectory = {
+    observations: [],
+    actions: [],
+    rewards: [],
+    values: [],
+    logProbs: [],
+    dones: [],
+  };
+  let episodeRewards: number[] = [];
+  let lastLosses = { policyLoss: 0, valueLoss: 0 };
+
   for (let episode = 0; episode < config.totalEpisodes && isTraining; episode++) {
     while (isPaused && isTraining) {
       await sleep(100);
     }
 
     if (!isTraining) break;
-
-    // Collect trajectory for this episode
-    const trajectory: Trajectory = {
-      observations: [],
-      actions: [],
-      rewards: [],
-      values: [],
-      logProbs: [],
-      dones: [],
-    };
 
     let state = physics!.reset();
     let episodeReward = 0;
@@ -128,13 +131,13 @@ async function trainLoop(config: TrainingConfig): Promise<void> {
       // Get reward and check termination
       const result = physics!.calculateReward();
 
-      // Store transition
-      trajectory.observations.push(observation);
-      trajectory.actions.push(action);
-      trajectory.rewards.push(result.reward);
-      trajectory.values.push(value);
-      trajectory.logProbs.push(logProb);
-      trajectory.dones.push(result.done);
+      // Store transition in batch
+      batchTrajectory.observations.push(observation);
+      batchTrajectory.actions.push(action);
+      batchTrajectory.rewards.push(result.reward);
+      batchTrajectory.values.push(value);
+      batchTrajectory.logProbs.push(logProb);
+      batchTrajectory.dones.push(result.done);
 
       episodeReward += result.reward;
       done = result.done;
@@ -151,42 +154,57 @@ async function trainLoop(config: TrainingConfig): Promise<void> {
       }
     }
 
-    // Train on collected trajectory
-    if (trajectory.observations.length > 0) {
-      const losses = await agent!.train(trajectory);
+    episodeRewards.push(episodeReward);
+    recentRewards.push(episodeReward);
+    if (recentRewards.length > 100) {
+      recentRewards.shift();
+    }
+    if (episodeReward > bestReward) {
+      bestReward = episodeReward;
+    }
 
-      // Track statistics
-      recentRewards.push(episodeReward);
-      if (recentRewards.length > 100) {
-        recentRewards.shift();
-      }
+    // Train when we have enough steps (batch training)
+    if (batchTrajectory.observations.length >= BATCH_SIZE) {
+      lastLosses = await agent!.train(batchTrajectory);
 
+      // Reset batch
+      batchTrajectory = {
+        observations: [],
+        actions: [],
+        rewards: [],
+        values: [],
+        logProbs: [],
+        dones: [],
+      };
+      episodeRewards = [];
+    }
+
+    // Report progress every 5 episodes
+    if (episode % 5 === 0) {
       const averageReward = recentRewards.reduce((a, b) => a + b, 0) / recentRewards.length;
-      if (episodeReward > bestReward) {
-        bestReward = episodeReward;
-      }
-
-      // Report progress every episode for debugging
-      if (episode % 1 === 0) {
-        postResponse({
-          type: 'progress',
-          data: {
-            episode: episode + 1,
-            totalEpisodes: config.totalEpisodes,
-            averageReward,
-            bestReward,
-            policyLoss: losses.policyLoss,
-            valueLoss: losses.valueLoss,
-            recentRewards: [...recentRewards],
-          },
-        });
-      }
+      postResponse({
+        type: 'progress',
+        data: {
+          episode: episode + 1,
+          totalEpisodes: config.totalEpisodes,
+          averageReward,
+          bestReward,
+          policyLoss: lastLosses.policyLoss,
+          valueLoss: lastLosses.valueLoss,
+          recentRewards: [...recentRewards],
+        },
+      });
     }
 
     // Allow other operations to process
     if (episode % 5 === 0) {
       await sleep(0);
     }
+  }
+
+  // Train on any remaining data
+  if (batchTrajectory.observations.length > 0) {
+    await agent!.train(batchTrajectory);
   }
 
   // Training complete - send final weights
