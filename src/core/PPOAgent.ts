@@ -15,6 +15,8 @@ interface PPOConfig {
   entropyCoef: number;
   batchSize: number;
   epochs: number;
+  maxGradNorm: number; // Gradient clipping
+  valueClipRange: number; // Value function clipping
 }
 
 const DEFAULT_CONFIG: PPOConfig = {
@@ -25,9 +27,11 @@ const DEFAULT_CONFIG: PPOConfig = {
   gamma: 0.99,
   epsilon: 0.2,
   valueCoef: 0.5,
-  entropyCoef: 0.01, // More exploration
+  entropyCoef: 0.01,
   batchSize: 64,
   epochs: 4,
+  maxGradNorm: 0.5, // Gradient clipping threshold
+  valueClipRange: 10.0, // Clip value predictions
 };
 
 interface Trajectory {
@@ -213,13 +217,15 @@ export class PPOAgent {
         const batchAdvantages = batchIndices.map((idx) => normalizedAdvantages[idx]);
         const batchReturns = batchIndices.map((idx) => returns[idx]);
         const batchOldLogProbs = batchIndices.map((idx) => logProbs[idx]);
+        const batchOldValues = batchIndices.map((idx) => values[idx]);
 
         const losses = await this.trainStep(
           batchObs,
           batchActions,
           batchAdvantages,
           batchReturns,
-          batchOldLogProbs
+          batchOldLogProbs,
+          batchOldValues
         );
 
         totalPolicyLoss += losses.policyLoss;
@@ -228,8 +234,8 @@ export class PPOAgent {
       }
     }
 
-    // Decay exploration
-    this.logStd = this.logStd.map((s) => Math.max(s * 0.999, -2));
+    // Decay exploration (faster decay for quicker convergence)
+    this.logStd = this.logStd.map((s) => Math.max(s * 0.995, -1.5));
 
     return {
       policyLoss: updateCount > 0 ? totalPolicyLoss / updateCount : 0,
@@ -237,12 +243,43 @@ export class PPOAgent {
     };
   }
 
+  // Clip gradients by global norm
+  private clipGradients(
+    grads: { [varName: string]: tf.Tensor },
+    maxNorm: number
+  ): { [varName: string]: tf.Tensor } {
+    const gradValues = Object.values(grads);
+    const gradNames = Object.keys(grads);
+
+    // Compute global norm
+    let sumSquares = tf.scalar(0);
+    for (const grad of gradValues) {
+      sumSquares = sumSquares.add(grad.square().sum());
+    }
+    const globalNorm = sumSquares.sqrt();
+    const clipCoef = tf.minimum(tf.scalar(1), tf.scalar(maxNorm).div(globalNorm.add(1e-6)));
+
+    // Clip each gradient
+    const clippedGrads: { [varName: string]: tf.Tensor } = {};
+    for (let i = 0; i < gradNames.length; i++) {
+      clippedGrads[gradNames[i]] = gradValues[i].mul(clipCoef);
+    }
+
+    // Clean up
+    sumSquares.dispose();
+    globalNorm.dispose();
+    clipCoef.dispose();
+
+    return clippedGrads;
+  }
+
   private async trainStep(
     observations: number[][],
     actions: number[][],
     advantages: number[],
     returns: number[],
-    oldLogProbs: number[]
+    oldLogProbs: number[],
+    oldValues: number[]
   ): Promise<{ policyLoss: number; valueLoss: number }> {
     let policyLossValue = 0;
     let valueLossValue = 0;
@@ -276,23 +313,45 @@ export class PPOAgent {
       return policyLoss.sub(entropy.mul(this.config.entropyCoef)) as tf.Scalar;
     });
 
-    this.policyOptimizer.applyGradients(policyGrads.grads);
+    // Clip gradients before applying
+    const clippedPolicyGrads = this.clipGradients(policyGrads.grads, this.config.maxGradNorm);
+    this.policyOptimizer.applyGradients(clippedPolicyGrads);
+
+    // Dispose clipped gradients
+    Object.values(clippedPolicyGrads).forEach(g => g.dispose());
     tf.dispose(policyGrads);
 
-    // Value update
+    // Value update with clipping
     const valueGrads = tf.variableGrads(() => {
       const obsTensor = tf.tensor2d(observations);
       const returnTensor = tf.tensor1d(returns);
+      const oldValueTensor = tf.tensor1d(oldValues);
 
       const valuePred = (this.valueNetwork.predict(obsTensor) as tf.Tensor).squeeze();
-      const valueLoss = valuePred.sub(returnTensor).square().mean();
+
+      // PPO-style value clipping
+      const valueClipped = oldValueTensor.add(
+        valuePred.sub(oldValueTensor).clipByValue(
+          -this.config.valueClipRange,
+          this.config.valueClipRange
+        )
+      );
+
+      const valueLoss1 = valuePred.sub(returnTensor).square();
+      const valueLoss2 = valueClipped.sub(returnTensor).square();
+      const valueLoss = tf.maximum(valueLoss1, valueLoss2).mean();
 
       valueLossValue = valueLoss.dataSync()[0];
 
       return valueLoss.mul(this.config.valueCoef) as tf.Scalar;
     });
 
-    this.valueOptimizer.applyGradients(valueGrads.grads);
+    // Clip gradients before applying
+    const clippedValueGrads = this.clipGradients(valueGrads.grads, this.config.maxGradNorm);
+    this.valueOptimizer.applyGradients(clippedValueGrads);
+
+    // Dispose clipped gradients
+    Object.values(clippedValueGrads).forEach(g => g.dispose());
     tf.dispose(valueGrads);
 
     return { policyLoss: policyLossValue, valueLoss: valueLossValue };
