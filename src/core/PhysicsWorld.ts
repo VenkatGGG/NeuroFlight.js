@@ -40,14 +40,7 @@ const DEFAULT_CONFIG: PhysicsConfig = {
   numObstacles: 20,
 };
 
-// Tree dimensions (must match generateObstacles)
-const MIN_TREE_HEIGHT = 3;
-const MAX_TREE_HEIGHT = 11; // 3 + 8
 const TERMINATION_HEIGHT = 30; // Very high ceiling - lots of room to learn
-
-// Flight constraints
-const MIN_FLIGHT_HEIGHT = 1.5;
-const MAX_FLIGHT_HEIGHT = 12; // Soft ceiling for penalties
 const IDEAL_FLIGHT_HEIGHT = 5; // Mid-level through trees
 const TARGET_HEIGHT_RANGE = [4, 7]; // Targets around ideal height
 
@@ -62,14 +55,6 @@ export class PhysicsWorld {
   private hasCollided = false;
   private stepCount = 0;
   private prevDistanceToTarget = 0;
-
-  // Motor positions relative to drone center (quad layout)
-  private readonly motorPositions: [number, number, number][] = [
-    [1, 0, 1],   // Front-Right
-    [-1, 0, 1],  // Front-Left
-    [-1, 0, -1], // Back-Left
-    [1, 0, -1],  // Back-Right
-  ];
 
   constructor(config: Partial<PhysicsConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -325,7 +310,6 @@ export class PhysicsWorld {
     // Calculate angle and distance to target
     const dx = this.targetPosition[0] - dronePos[0];
     const dz = this.targetPosition[2] - dronePos[2];
-    const dy = this.targetPosition[1] - dronePos[1];
     const horizontalDist = Math.sqrt(dx * dx + dz * dz);
     const angleToTarget = Math.atan2(dx, dz);
 
@@ -385,7 +369,6 @@ export class PhysicsWorld {
   calculateReward(): { reward: number; done: boolean; info: Record<string, number> } {
     const state = this.getState();
     const pos = state.position;
-    const vel = state.velocity;
 
     // === TERMINATION CONDITIONS (only hard failures) ===
     if (this.hasCollided) {
@@ -403,9 +386,9 @@ export class PhysicsWorld {
       return { reward: -10.0, done: true, info: { tooHigh: 1 } };
     }
 
-    // Too low - crashed into ground (big penalty!)
+    // Too low - crashed into ground
     if (pos[1] < 0.3) {
-      return { reward: -50.0, done: true, info: { crashed: 1 } };
+      return { reward: -10.0, done: true, info: { crashed: 1 } };
     }
 
     // Calculate 3D distance to target
@@ -416,28 +399,30 @@ export class PhysicsWorld {
 
     // Reached target
     if (distToTarget < 3.0) {
-      return { reward: 200.0, done: true, info: { reachedTarget: 1 } };
+      return { reward: 10.0, done: true, info: { reachedTarget: 1 } };
     }
 
-    // === SIMPLIFIED REWARDS - Focus on reaching target ===
+    // === SCALED REWARDS - PPO-friendly range ===
     let reward = 0;
 
-    // 1. DISTANCE TO TARGET (main signal!) - use full 3D distance
-    // Note: dx, dy, dz and distToTarget already calculated above
+    // 1. DISTANCE TO TARGET - scaled down for stable learning
     const fullDist = distToTarget;
     const distImprovement = this.prevDistanceToTarget - fullDist;
-    reward += distImprovement * 20.0; // VERY strong signal for getting closer
+    reward += distImprovement * 2.0; // Scaled down from 20x
     this.prevDistanceToTarget = fullDist;
 
     // 2. PROXIMITY BONUS - bigger reward when close to target
     if (fullDist < 10) {
-      reward += (10 - fullDist) * 0.1; // Up to +1.0 when very close
+      reward += (10 - fullDist) * 0.05; // Up to +0.5 when very close
     }
 
-    // 3. SMALL SURVIVAL BONUS (to prefer longer episodes)
-    reward += 0.01;
+    // 3. SMALL SURVIVAL BONUS
+    reward += 0.005;
 
-    // Max steps check - enough time to reach target
+    // Clip reward to stable range
+    reward = Math.max(-10, Math.min(10, reward));
+
+    // Max steps check
     const done = this.stepCount >= 2000;
 
     return {
