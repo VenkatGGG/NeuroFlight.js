@@ -381,7 +381,7 @@ export class PhysicsWorld {
       return { reward: -10.0, done: true, info: { outOfBounds: 1 } };
     }
 
-    // Too high - terminate at 9m
+    // Too high - terminate at 30m ceiling
     if (pos[1] > TERMINATION_HEIGHT) {
       return { reward: -10.0, done: true, info: { tooHigh: 1 } };
     }
