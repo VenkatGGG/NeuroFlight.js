@@ -3,7 +3,8 @@
  * Runs physics + AI training at max speed without blocking UI
  */
 import { PhysicsWorld } from '../core/PhysicsWorld';
-import { PPOAgent, Trajectory } from '../core/PPOAgent';
+import { PPOAgent } from '../core/ppo/Agent';
+import { Trajectory } from '../core/ppo/types';
 import { writeToSharedBuffer } from '../store/trainingStore';
 
 interface TrainingConfig {

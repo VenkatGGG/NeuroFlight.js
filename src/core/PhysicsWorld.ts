@@ -406,11 +406,28 @@ export class PhysicsWorld {
 
     // 2. PROXIMITY BONUS - bigger reward when close to target
     if (fullDist < 10) {
-      reward += (10 - fullDist) * 0.05; // Up to +0.5 when very close
+      reward += (10 - fullDist) * 0.1; // Increased: up to +1.0 when very close
     }
 
-    // 3. SMALL SURVIVAL BONUS
-    reward += 0.005;
+    // 3. SURVIVAL BONUS - Slightly increased
+    reward += 0.01;
+
+    // 4. ANGULAR VELOCITY PENALTY (Stability)
+    // Penalize spinning too fast
+    const angVel = state.angularVelocity;
+    const spinMagnitude = Math.sqrt(angVel[0] ** 2 + angVel[1] ** 2 + angVel[2] ** 2);
+    reward -= spinMagnitude * 0.005;
+
+    // 5. ORIENTATION PENALTY (Uprightness)
+    // Penalize being upside down or tilted too much
+    // dot product of local up (0,1,0) rotated to world vs world up (0,1,0)
+    // We can use the pitch/roll from getObservation logic or just check Y component of rotated up vector
+    // Simple version: penalize large pitch/roll
+    const pitch = Math.abs(state.rotation[0]); // Approximation from quaternion if small angles
+    const roll = Math.abs(state.rotation[2]);
+    if (pitch > 0.5 || roll > 0.5) {
+       reward -= 0.05;
+    }
 
     // Clip reward to stable range
     reward = Math.max(-10, Math.min(10, reward));
