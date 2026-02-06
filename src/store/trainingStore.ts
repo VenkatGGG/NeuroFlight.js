@@ -98,9 +98,10 @@ export const useTrainingStore = create<TrainingStore>((set, get) => ({
   setPaused: (isPaused) => set({ isPaused }),
   setProgress: (progress) => set({ trainingProgress: progress }),
 
-  setStats: (newStats) => set((state) => ({
-    stats: { ...state.stats, ...newStats },
-  })),
+  setStats: (newStats) =>
+    set((state) => ({
+      stats: { ...state.stats, ...newStats },
+    })),
 
   setRunning: (isRunning) => set({ isRunning }),
   setDroneState: (droneState) => set({ droneState }),
@@ -117,15 +118,15 @@ export const useTrainingStore = create<TrainingStore>((set, get) => ({
     const sharedArray = new Float32Array(sharedBuffer);
 
     // Initialize with default drone state
-    sharedArray[0] = 0;  // x
-    sharedArray[1] = 2;  // y
-    sharedArray[2] = 0;  // z
-    sharedArray[3] = 0;  // qx
-    sharedArray[4] = 0;  // qy
-    sharedArray[5] = 0;  // qz
-    sharedArray[6] = 1;  // qw
+    sharedArray[0] = 0; // x
+    sharedArray[1] = 2; // y
+    sharedArray[2] = 0; // z
+    sharedArray[3] = 0; // qx
+    sharedArray[4] = 0; // qy
+    sharedArray[5] = 0; // qz
+    sharedArray[6] = 1; // qw
     sharedArray[7] = 10; // target x
-    sharedArray[8] = 2;  // target y
+    sharedArray[8] = 2; // target y
     sharedArray[9] = 10; // target z
     sharedArray[10] = 0; // update flag
 
@@ -140,19 +141,25 @@ export const useTrainingStore = create<TrainingStore>((set, get) => ({
 
     return {
       position: [sharedArray[0], sharedArray[1], sharedArray[2]] as [number, number, number],
-      rotation: [sharedArray[3], sharedArray[4], sharedArray[5], sharedArray[6]] as [number, number, number, number],
+      rotation: [sharedArray[3], sharedArray[4], sharedArray[5], sharedArray[6]] as [
+        number,
+        number,
+        number,
+        number,
+      ],
       targetPosition: [sharedArray[7], sharedArray[8], sharedArray[9]] as [number, number, number],
     };
   },
 
-  reset: () => set({
-    isTraining: false,
-    isPaused: false,
-    trainingProgress: 0,
-    stats: initialStats,
-    isRunning: false,
-    droneState: initialDroneState,
-  }),
+  reset: () =>
+    set({
+      isTraining: false,
+      isPaused: false,
+      trainingProgress: 0,
+      stats: initialStats,
+      isRunning: false,
+      droneState: initialDroneState,
+    }),
 }));
 
 // Helper to write drone state to SharedArrayBuffer (used by worker)

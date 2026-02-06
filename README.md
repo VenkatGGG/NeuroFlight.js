@@ -7,6 +7,7 @@ A browser-based reinforcement learning environment for training autonomous drone
 NeuroFlight.js implements a "digital twin" architecture where physics simulation runs separately from visualization. This allows training to happen in a Web Worker without blocking the UI, while a 3D view shows the drone's behavior in real-time.
 
 The drone has four motors and must learn to:
+
 - Maintain stable flight
 - Navigate toward target positions
 - Avoid collisions with trees
@@ -78,17 +79,20 @@ Open http://localhost:5173 in your browser.
 Key parameters can be adjusted in the source files:
 
 **PhysicsWorld.ts**
+
 - `TERMINATION_HEIGHT` - Maximum flight altitude
 - `TARGET_HEIGHT_RANGE` - Height range for target placement
 - Reward scaling factors
 
 **PPOAgent.ts**
+
 - `learningRate` - Neural network learning rate
 - `gamma` - Discount factor for future rewards
 - `epsilon` - PPO clipping range
 - `hiddenLayers` - Network architecture
 
 **TrainingWorker.ts**
+
 - `BATCH_SIZE` - Steps to collect before training
 - `maxStepsPerEpisode` - Maximum episode length
 

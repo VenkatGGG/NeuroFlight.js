@@ -91,7 +91,7 @@ export class PhysicsWorld {
   private createDrone(): void {
     const droneDesc = RAPIER.RigidBodyDesc.dynamic()
       .setTranslation(0, 2, 0)
-      .setLinearDamping(1.5)  // Moderate drag
+      .setLinearDamping(1.5) // Moderate drag
       .setAngularDamping(4.0); // Balanced - some tilt allowed but no crazy flipping
 
     this.drone = this.world.createRigidBody(droneDesc);
@@ -119,8 +119,7 @@ export class PhysicsWorld {
       // Don't place obstacles too close to spawn
       if (Math.abs(x) < 3 && Math.abs(z) < 3) continue;
 
-      const obstacleDesc = RAPIER.RigidBodyDesc.fixed()
-        .setTranslation(x, height / 2, z);
+      const obstacleDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(x, height / 2, z);
       const obstacle = this.world.createRigidBody(obstacleDesc);
 
       const colliderDesc = RAPIER.ColliderDesc.cylinder(height / 2, radius);
@@ -136,13 +135,9 @@ export class PhysicsWorld {
     // Closer targets for easier learning (8-15m instead of 15-35m)
     const distance = 8 + Math.random() * 7;
     // Target height within tree canopy level
-    const targetHeight = TARGET_HEIGHT_RANGE[0] +
-      Math.random() * (TARGET_HEIGHT_RANGE[1] - TARGET_HEIGHT_RANGE[0]);
-    this.targetPosition = [
-      Math.cos(angle) * distance,
-      targetHeight,
-      Math.sin(angle) * distance,
-    ];
+    const targetHeight =
+      TARGET_HEIGHT_RANGE[0] + Math.random() * (TARGET_HEIGHT_RANGE[1] - TARGET_HEIGHT_RANGE[0]);
+    this.targetPosition = [Math.cos(angle) * distance, targetHeight, Math.sin(angle) * distance];
   }
 
   applyMotorForces(thrusts: number[]): void {
@@ -155,14 +150,14 @@ export class PhysicsWorld {
     const t3 = Math.max(0, Math.min(1, thrusts[3])); // Back-Right
 
     // Total thrust magnitude
-    const totalThrust = (t0 + t1 + t2 + t3) / 4 * this.config.maxMotorForce;
+    const totalThrust = ((t0 + t1 + t2 + t3) / 4) * this.config.maxMotorForce;
 
     // Pitch control: front vs back (positive = nose down)
-    const pitchDiff = ((t2 + t3) - (t0 + t1)) / 4;
+    const pitchDiff = (t2 + t3 - (t0 + t1)) / 4;
     // Roll control: right vs left (positive = roll right)
-    const rollDiff = ((t1 + t2) - (t0 + t3)) / 4;
+    const rollDiff = (t1 + t2 - (t0 + t3)) / 4;
     // Yaw control: diagonal pairs
-    const yawDiff = ((t0 + t2) - (t1 + t3)) / 4;
+    const yawDiff = (t0 + t2 - (t1 + t3)) / 4;
 
     // CRITICAL: Apply thrust in drone's LOCAL up direction
     // When drone tilts, thrust vector tilts with it → horizontal movement!
@@ -180,9 +175,9 @@ export class PhysicsWorld {
     const torqueScale = 0.08;
     this.drone.applyTorqueImpulse(
       {
-        x: pitchDiff * torqueScale,  // Pitch
+        x: pitchDiff * torqueScale, // Pitch
         y: yawDiff * torqueScale * 0.3, // Yaw (less)
-        z: rollDiff * torqueScale,   // Roll
+        z: rollDiff * torqueScale, // Roll
       },
       true
     );
@@ -205,8 +200,13 @@ export class PhysicsWorld {
     q: { x: number; y: number; z: number; w: number }
   ): [number, number, number] {
     // Quaternion rotation of vector
-    const qx = q.x, qy = q.y, qz = q.z, qw = q.w;
-    const vx = v[0], vy = v[1], vz = v[2];
+    const qx = q.x,
+      qy = q.y,
+      qz = q.z,
+      qw = q.w;
+    const vx = v[0],
+      vy = v[1],
+      vz = v[2];
 
     const ix = qw * vx + qy * vz - qz * vy;
     const iy = qw * vy + qz * vx - qx * vz;
@@ -232,11 +232,7 @@ export class PhysicsWorld {
       const angle = (angleDeg * Math.PI) / 180;
 
       // Local direction
-      const localDir: [number, number, number] = [
-        Math.sin(angle),
-        0,
-        Math.cos(angle),
-      ];
+      const localDir: [number, number, number] = [Math.sin(angle), 0, Math.cos(angle)];
 
       // Transform to world space
       const worldDir = this.rotateVector(localDir, rotation);
@@ -256,9 +252,7 @@ export class PhysicsWorld {
       );
 
       // Normalize distance [0-1], 1 = no obstacle
-      const normalizedDist = hit
-        ? hit.timeOfImpact / this.config.raycastRange
-        : 1.0;
+      const normalizedDist = hit ? hit.timeOfImpact / this.config.raycastRange : 1.0;
 
       distances.push(normalizedDist);
     }
@@ -376,8 +370,7 @@ export class PhysicsWorld {
     }
 
     // Out of bounds (horizontal)
-    if (Math.abs(pos[0]) > this.config.worldSize ||
-        Math.abs(pos[2]) > this.config.worldSize) {
+    if (Math.abs(pos[0]) > this.config.worldSize || Math.abs(pos[2]) > this.config.worldSize) {
       return { reward: -10.0, done: true, info: { outOfBounds: 1 } };
     }
 
@@ -431,7 +424,7 @@ export class PhysicsWorld {
       info: {
         distToTarget: fullDist,
         height: pos[1],
-      }
+      },
     };
   }
 

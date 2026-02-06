@@ -33,10 +33,9 @@ export function Dashboard() {
   // Initialize worker
   useEffect(() => {
     console.log('Initializing training worker...');
-    workerRef.current = new Worker(
-      new URL('../workers/TrainingWorker.ts', import.meta.url),
-      { type: 'module' }
-    );
+    workerRef.current = new Worker(new URL('../workers/TrainingWorker.ts', import.meta.url), {
+      type: 'module',
+    });
 
     workerRef.current.onerror = (e) => {
       console.error('Worker error:', e);
@@ -153,9 +152,7 @@ export function Dashboard() {
     }
   }, [isRunning, modelWeights, sharedBuffer, setRunning]);
 
-  const progress = stats.totalEpisodes > 0
-    ? (stats.episode / stats.totalEpisodes) * 100
-    : 0;
+  const progress = stats.totalEpisodes > 0 ? (stats.episode / stats.totalEpisodes) * 100 : 0;
 
   return (
     <div style={styles.container}>
@@ -210,7 +207,9 @@ export function Dashboard() {
           <div style={styles.progressContainer}>
             <div style={styles.progressLabel}>
               <span>Progress</span>
-              <span>{stats.episode} / {stats.totalEpisodes}</span>
+              <span>
+                {stats.episode} / {stats.totalEpisodes}
+              </span>
             </div>
             <div style={styles.progressBar}>
               <div
@@ -225,9 +224,7 @@ export function Dashboard() {
           <div style={styles.statsGrid}>
             <div style={styles.statItem}>
               <span style={styles.statLabel}>Avg Reward</span>
-              <span style={styles.statValue}>
-                {stats.averageReward.toFixed(2)}
-              </span>
+              <span style={styles.statValue}>{stats.averageReward.toFixed(2)}</span>
             </div>
             <div style={styles.statItem}>
               <span style={styles.statLabel}>Best Reward</span>
@@ -237,15 +234,11 @@ export function Dashboard() {
             </div>
             <div style={styles.statItem}>
               <span style={styles.statLabel}>Policy Loss</span>
-              <span style={styles.statValue}>
-                {stats.policyLoss.toFixed(4)}
-              </span>
+              <span style={styles.statValue}>{stats.policyLoss.toFixed(4)}</span>
             </div>
             <div style={styles.statItem}>
               <span style={styles.statLabel}>Value Loss</span>
-              <span style={styles.statValue}>
-                {stats.valueLoss.toFixed(4)}
-              </span>
+              <span style={styles.statValue}>{stats.valueLoss.toFixed(4)}</span>
             </div>
           </div>
 
@@ -257,11 +250,7 @@ export function Dashboard() {
         </div>
       )}
 
-      {modelWeights && (
-        <div style={styles.modelBadge}>
-          Trained model ready
-        </div>
-      )}
+      {modelWeights && <div style={styles.modelBadge}>Trained model ready</div>}
     </div>
   );
 }
@@ -328,12 +317,7 @@ function RewardChart({ rewards }: { rewards: number[] }) {
   }, [rewards]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      width={280}
-      height={100}
-      style={{ width: '100%', height: '100px' }}
-    />
+    <canvas ref={canvasRef} width={280} height={100} style={{ width: '100%', height: '100px' }} />
   );
 }
 

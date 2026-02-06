@@ -65,55 +65,63 @@ export class PPOAgent {
   private buildNetworks(): void {
     // Policy Network (Actor)
     this.policyNetwork = tf.sequential();
-    this.policyNetwork.add(tf.layers.dense({
-      inputShape: [this.config.observationSize],
-      units: this.config.hiddenLayers[0],
-      activation: 'relu',
-      kernelInitializer: 'heNormal',
-    }));
-
-    for (let i = 1; i < this.config.hiddenLayers.length; i++) {
-      this.policyNetwork.add(tf.layers.dense({
-        units: this.config.hiddenLayers[i],
+    this.policyNetwork.add(
+      tf.layers.dense({
+        inputShape: [this.config.observationSize],
+        units: this.config.hiddenLayers[0],
         activation: 'relu',
         kernelInitializer: 'heNormal',
-      }));
+      })
+    );
+
+    for (let i = 1; i < this.config.hiddenLayers.length; i++) {
+      this.policyNetwork.add(
+        tf.layers.dense({
+          units: this.config.hiddenLayers[i],
+          activation: 'relu',
+          kernelInitializer: 'heNormal',
+        })
+      );
     }
 
-    this.policyNetwork.add(tf.layers.dense({
-      units: this.config.actionSize,
-      activation: 'tanh',
-      kernelInitializer: tf.initializers.glorotNormal({}),
-    }));
+    this.policyNetwork.add(
+      tf.layers.dense({
+        units: this.config.actionSize,
+        activation: 'tanh',
+        kernelInitializer: tf.initializers.glorotNormal({}),
+      })
+    );
 
     // Value Network (Critic)
     this.valueNetwork = tf.sequential();
-    this.valueNetwork.add(tf.layers.dense({
-      inputShape: [this.config.observationSize],
-      units: this.config.hiddenLayers[0],
-      activation: 'relu',
-      kernelInitializer: 'heNormal',
-    }));
-
-    for (let i = 1; i < this.config.hiddenLayers.length; i++) {
-      this.valueNetwork.add(tf.layers.dense({
-        units: this.config.hiddenLayers[i],
+    this.valueNetwork.add(
+      tf.layers.dense({
+        inputShape: [this.config.observationSize],
+        units: this.config.hiddenLayers[0],
         activation: 'relu',
         kernelInitializer: 'heNormal',
-      }));
+      })
+    );
+
+    for (let i = 1; i < this.config.hiddenLayers.length; i++) {
+      this.valueNetwork.add(
+        tf.layers.dense({
+          units: this.config.hiddenLayers[i],
+          activation: 'relu',
+          kernelInitializer: 'heNormal',
+        })
+      );
     }
 
-    this.valueNetwork.add(tf.layers.dense({
-      units: 1,
-      kernelInitializer: tf.initializers.glorotNormal({}),
-    }));
+    this.valueNetwork.add(
+      tf.layers.dense({
+        units: 1,
+        kernelInitializer: tf.initializers.glorotNormal({}),
+      })
+    );
   }
 
-  private gaussianLogProb(
-    actions: tf.Tensor,
-    means: tf.Tensor,
-    logStd: number[]
-  ): tf.Tensor {
+  private gaussianLogProb(actions: tf.Tensor, means: tf.Tensor, logStd: number[]): tf.Tensor {
     const std = logStd.map(Math.exp);
     const variance = std.map((s) => s * s);
 
@@ -125,7 +133,8 @@ export class PPOAgent {
 
       // -0.5 * (log(2*pi) + 2*logStd + (x-mean)^2/var)
       const logProb = tf.scalar(-0.5).mul(
-        tf.scalar(Math.log(2 * Math.PI))
+        tf
+          .scalar(Math.log(2 * Math.PI))
           .add(logStdTensor.mul(2))
           .add(diffSquared.div(varianceTensor))
       );
@@ -134,7 +143,10 @@ export class PPOAgent {
     });
   }
 
-  selectAction(observation: number[], deterministic = false): {
+  selectAction(
+    observation: number[],
+    deterministic = false
+  ): {
     action: number[];
     logProb: number;
     value: number;
@@ -190,7 +202,8 @@ export class PPOAgent {
 
     // Normalize advantages
     const advMean = advantages.reduce((a, b) => a + b, 0) / advantages.length;
-    const advVariance = advantages.reduce((sum, a) => sum + (a - advMean) ** 2, 0) / advantages.length;
+    const advVariance =
+      advantages.reduce((sum, a) => sum + (a - advMean) ** 2, 0) / advantages.length;
     const advStd = Math.sqrt(advVariance) + 1e-8;
     const normalizedAdvantages = advantages.map((a) => (a - advMean) / advStd);
 
@@ -208,7 +221,10 @@ export class PPOAgent {
       }
 
       for (let i = 0; i < observations.length; i += this.config.batchSize) {
-        const batchIndices = indices.slice(i, Math.min(i + this.config.batchSize, observations.length));
+        const batchIndices = indices.slice(
+          i,
+          Math.min(i + this.config.batchSize, observations.length)
+        );
 
         if (batchIndices.length === 0) continue;
 
@@ -305,7 +321,8 @@ export class PPOAgent {
       const policyLoss = tf.minimum(surrogate1, surrogate2).mean().neg();
 
       // Entropy bonus
-      const entropy = tf.scalar(0.5 * this.config.actionSize * (1 + Math.log(2 * Math.PI)))
+      const entropy = tf
+        .scalar(0.5 * this.config.actionSize * (1 + Math.log(2 * Math.PI)))
         .add(tf.tensor1d(this.logStd).sum());
 
       policyLossValue = policyLoss.dataSync()[0];
@@ -318,7 +335,7 @@ export class PPOAgent {
     this.policyOptimizer.applyGradients(clippedPolicyGrads);
 
     // Dispose clipped gradients
-    Object.values(clippedPolicyGrads).forEach(g => g.dispose());
+    Object.values(clippedPolicyGrads).forEach((g) => g.dispose());
     tf.dispose(policyGrads);
 
     // Value update with clipping
@@ -331,10 +348,9 @@ export class PPOAgent {
 
       // PPO-style value clipping
       const valueClipped = oldValueTensor.add(
-        valuePred.sub(oldValueTensor).clipByValue(
-          -this.config.valueClipRange,
-          this.config.valueClipRange
-        )
+        valuePred
+          .sub(oldValueTensor)
+          .clipByValue(-this.config.valueClipRange, this.config.valueClipRange)
       );
 
       const valueLoss1 = valuePred.sub(returnTensor).square();
@@ -351,7 +367,7 @@ export class PPOAgent {
     this.valueOptimizer.applyGradients(clippedValueGrads);
 
     // Dispose clipped gradients
-    Object.values(clippedValueGrads).forEach(g => g.dispose());
+    Object.values(clippedValueGrads).forEach((g) => g.dispose());
     tf.dispose(valueGrads);
 
     return { policyLoss: policyLossValue, valueLoss: valueLossValue };
@@ -369,7 +385,8 @@ export class PPOAgent {
     for (let t = rewards.length - 1; t >= 0; t--) {
       const nextValue = t === rewards.length - 1 ? 0 : values[t + 1];
       const delta = rewards[t] + this.config.gamma * nextValue * (dones[t] ? 0 : 1) - values[t];
-      advantages[t] = lastAdvantage = delta + this.config.gamma * lambda * (dones[t] ? 0 : 1) * lastAdvantage;
+      advantages[t] = lastAdvantage =
+        delta + this.config.gamma * lambda * (dones[t] ? 0 : 1) * lastAdvantage;
     }
 
     return advantages;

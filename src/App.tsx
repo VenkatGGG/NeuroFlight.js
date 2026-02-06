@@ -23,9 +23,7 @@ function App() {
       <Dashboard />
       <div style={styles.footer}>
         <span>Powered by Rapier Physics + TensorFlow.js</span>
-        <span style={styles.keybinds}>
-          Drag to rotate · Scroll to zoom · Shift+Drag to pan
-        </span>
+        <span style={styles.keybinds}>Drag to rotate · Scroll to zoom · Shift+Drag to pan</span>
       </div>
     </div>
   );
